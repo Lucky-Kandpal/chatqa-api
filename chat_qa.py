@@ -1,4 +1,4 @@
-
+#running -> uvicorn chat_qa:app --reload --host 0.0.0.0 --log-level debug
 import json
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
