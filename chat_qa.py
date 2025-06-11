@@ -7,6 +7,7 @@ from datetime import datetime
 from collections import Counter
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ app.add_middleware(
 
 class QueryInput(BaseModel):
     query: str
+    groupId: str
+    groupName: str
 
 
 # ===== Helper Functions =====
@@ -312,7 +315,7 @@ Instructions:
 @app.post("/query")
 async def ask_question(payload: QueryInput):
     query = payload.query
-    logger.info(f"Received query: {query}")
+    logger.info(f"Received query: {query}, payload: {payload}")
     # First, classify the query
     try:
         # Check for greetings anywhere in the query
@@ -364,15 +367,29 @@ async def ask_question(payload: QueryInput):
     
     # Generate response for non-greeting/conversational queries
     start_time = time.time()
+    # Count tokens separately
+    system_prompt_tokens = count_tokens(SYSTEM_PROMPT)
+    query_tokens = count_tokens(prompt)
     response = llm.invoke(prompt, system_prompt=SYSTEM_PROMPT)
     end_time = time.time()
     
-    # Log token emission rate
-    tokens = count_tokens(response.content)
+    # Count output tokens
+    output_tokens = count_tokens(response.content)
+    total_input_tokens = system_prompt_tokens + query_tokens
+    total_tokens = output_tokens
     duration = end_time - start_time
-    logger.info(f"LLM Response - Tokens: {tokens}, Duration: {duration:.2f}s")
+    
+    # Log token generation metrics
     if duration > 0:
-        tokens_per_second = tokens / duration
-        logger.info(f"LLM Response - Tokens: {tokens}, Duration: {duration:.2f}s, Tokens/Sec: {tokens_per_second:.2f}")
+        tokens_per_second = total_tokens / duration
+        logger.info(f"LLM Processing Metrics - ")
+        logger.info(f"  System Prompt Tokens: {system_prompt_tokens}")
+        logger.info(f"  Query Tokens: {query_tokens}")
+        logger.info(f"  Total Input Tokens: {total_input_tokens}")
+        logger.info(f"  Output Tokens: {output_tokens}")
+        logger.info(f"  Total Tokens: {total_tokens}") 
+        logger.info(f"  Duration: {duration:.2f}s")
+        logger.info(f"  Tokens/Sec: {tokens_per_second:.2f}")
+        logger.info(f"  Input/Output Ratio: {total_input_tokens/output_tokens:.2f}")
     
     return response.content.strip()
